@@ -6,33 +6,22 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     ld = LaunchDescription()
-
-    #parameters = os.path.join(get_package_share_directory('pushcorp_driver'), 'config/network_parameters.yaml')
     
     parameters = {
         'ip': '192.168.0.12',
-        'port': 1993
+        'port': 1993,
+        'period': 0.1
     }    
     
-    # Launch AFD Position Publisher
-    afd_position_publisher = Node(
+    # Launch AFD driver
+    afd_driver = Node(
         package='pushcorp_driver',
-        executable='afd_position_publisher',
-        name='afd_position_publisher',
+        executable='afd_driver',
+        name='afd_driver',
         output='screen',
         parameters=[parameters]
     )
 
-    # Launch AFD Force Publisher
-    afd_force_publisher = Node(
-        package='pushcorp_driver',
-        executable='afd_force_publisher',
-        name='afd_force_publisher',
-        output='screen',
-        parameters=[parameters] 
-    )
-
-    ld.add_action(afd_position_publisher)
-    ld.add_action(afd_force_publisher)
+    ld.add_action(afd_driver)
     return ld
 

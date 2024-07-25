@@ -24,8 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'afd_position_publisher = pushcorp_driver.afd_position_publisher:main',
-            'afd_force_publisher = pushcorp_driver.afd_force_publisher:main'
+            'afd_driver = pushcorp_driver.afd_driver:main',
         ],
     },
 )
