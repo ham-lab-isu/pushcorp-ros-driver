@@ -1,0 +1,8 @@
+int8 POSITION=0
+int8 FORCE=1
+
+int8 mode
+---
+
+bool success
+string message

@@ -1,6 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from pushcorp_msgs.msg import Value
+from pushcorp_msgs.srv import SetControlMode, CommandValue
+from std_srvs.srv import Trigger
 import socket
 import time 
 import json
@@ -8,6 +10,10 @@ import json
 
 POSITION_ENDPOINT = "/afd/actualPosition"
 FORCE_ENDPOINT = "/afd/actualForce"
+COMMAND_FORCE_ENDPOINT = "/afd/commandForce"
+COMMAND_POSITION_ENDPOINT = "/afd/commandPosition"
+SET_CONTROL_MODE_ENDPOINT = "/afd/controlMode"
+WEIGH_PAYLOAD_ENDPOINT = "/afd/weighPayload"
 
 
 class AFDDriver(Node):
@@ -26,19 +32,31 @@ class AFDDriver(Node):
         # Create the ROS2 interfaces
         self.pos_pub = self.create_publisher(Value, 'afd/position', 10)
         self.force_pub = self.create_publisher(Value, 'afd/force', 10)
+        self.weigh_payload_server = self.create_service(Trigger, 'weigh_payload', self.weigh_payload)
+        self.set_control_mode_server = self.create_service(SetControlMode, 'set_control_mode', self.set_control_mode)
+        self.command_force_server = self.create_service(CommandValue, 'command_force', self.command_force)
+        self.command_position_server = self.create_service(CommandValue, 'command_position', self.command_position)
 
         # Create a timer for reading from the AFD
         self.timer = self.create_timer(period, self.publish_udp_data)
 
+    def send(self,
+             udp_socket: socket.socket,
+             endpoint: str,
+             buffer_size: int = 1024) -> dict:
+      udp_socket.sendto(endpoint.encode(), (self.ip, self.port))
+      response, _ = udp_socket.recvfrom(buffer_size)
+      return json.loads(response.decode())
+
     def read(self,
              udp_socket: socket.socket,
              endpoint: str) -> Value:
-        udp_socket.sendto(endpoint.encode(), (self.ip, self.port))
-        response, _ = udp_socket.recvfrom(1024)  # Adjust the buffer size as needed
+        # Send the command
+        response = self.send(udp_socket, endpoint)
 
         # Convert to message
         msg = Value()
-        msg.value = json.loads(response.decode())['data'][endpoint]
+        msg.value = response['data'][endpoint]
 
         msg.timestamp = self.get_clock().now().to_msg()
 
@@ -54,6 +72,47 @@ class AFDDriver(Node):
         # Publish the ROS message
         self.pos_pub.publish(pos_msg)
         self.force_pub.publish(force_msg)
+
+    def weigh_payload(self, _req: Trigger.Request, res: Trigger.Response) -> Trigger.Response:
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        response = self.send(udp_socket, WEIGH_PAYLOAD_ENDPOINT)
+        res.success = response['status'] == 'success'
+        if not res.success:
+            res.message = 'Failed to weigh payload'
+
+        return res
+
+    def set_control_mode(self, req: SetControlMode.Request, res: SetControlMode.Response) -> SetControlMode.Response:
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if not req.mode in (0, 1):
+            res.success = False
+            res.message = f'Mode must either be 0 (position) or 1 (force)'
+            return res
+
+        response = self.send(udp_socket, f'{SET_CONTROL_MODE_ENDPOINT}={req.mode}')
+        res.success = response['status'] == 'success'
+        if not res.success:
+            res.message = 'Failed to set command mode'
+
+        return res
+
+    def command_force(self, req: CommandValue.Request, res: CommandValue.Response) -> CommandValue.Response:
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        response = self.send(udp_socket, f'{COMMAND_FORCE_ENDPOINT}={req.value}')
+        res.success = response['status'] == 'success'
+        if not res.success:
+            res.message = 'Failed to command force'
+
+        return res
+
+    def command_position(self, req: CommandValue.Request, res: CommandValue.Response) -> CommandValue.Response:
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        response = self.send(udp_socket, f'{COMMAND_POSITION_ENDPOINT}={req.value}')
+        res.success = response['status'] == 'success'
+        if not res.success:
+            res.message = 'Failed to command position'
+
+        return res
 
 
 def main(args=None):
