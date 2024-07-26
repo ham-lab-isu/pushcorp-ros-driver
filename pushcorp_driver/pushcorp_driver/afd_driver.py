@@ -14,6 +14,8 @@ COMMAND_FORCE_ENDPOINT = "/afd/commandForce"
 COMMAND_POSITION_ENDPOINT = "/afd/commandPosition"
 SET_CONTROL_MODE_ENDPOINT = "/afd/controlMode"
 WEIGH_PAYLOAD_ENDPOINT = "/afd/weighPayload"
+SUCCESS_VALUE = 'success'
+STATUS_KEY = 'status'
 
 
 def create_socket():
@@ -64,8 +66,8 @@ class AFDDriver(Node):
             # Send the request
             response = self.send(udp_socket, endpoint)
 
-            status = response['status']
-            if status != 'success':
+            status = response[STATUS_KEY]
+            if status != SUCCESS_VALUE:
                 self.get_logger().info(f'Failed to read endpoint \'{endpoint}\': {status}')
                 return None
 
@@ -93,7 +95,7 @@ class AFDDriver(Node):
     def weigh_payload(self, _req: Trigger.Request, res: Trigger.Response) -> Trigger.Response:
         udp_socket = create_socket()
         response = self.send(udp_socket, WEIGH_PAYLOAD_ENDPOINT)
-        res.success = response['status'] == 'success'
+        res.success = response[STATUS_KEY] == SUCCESS_VALUE
         if not res.success:
             res.message = 'Failed to weigh payload'
 
@@ -107,7 +109,7 @@ class AFDDriver(Node):
             return res
 
         response = self.send(udp_socket, f'{SET_CONTROL_MODE_ENDPOINT}={req.mode}')
-        res.success = response['status'] == 'success'
+        res.success = response[STATUS_KEY] == SUCCESS_VALUE
         if not res.success:
             res.message = 'Failed to set command mode'
 
@@ -116,7 +118,7 @@ class AFDDriver(Node):
     def command_force(self, req: CommandValue.Request, res: CommandValue.Response) -> CommandValue.Response:
         udp_socket = create_socket()
         response = self.send(udp_socket, f'{COMMAND_FORCE_ENDPOINT}={req.value}')
-        res.success = response['status'] == 'success'
+        res.success = response[STATUS_KEY] == SUCCESS_VALUE
         if not res.success:
             res.message = 'Failed to command force'
 
@@ -125,7 +127,7 @@ class AFDDriver(Node):
     def command_position(self, req: CommandValue.Request, res: CommandValue.Response) -> CommandValue.Response:
         udp_socket = create_socket()
         response = self.send(udp_socket, f'{COMMAND_POSITION_ENDPOINT}={req.value}')
-        res.success = response['status'] == 'success'
+        res.success = response[STATUS_KEY] == SUCCESS_VALUE
         if not res.success:
             res.message = 'Failed to command position'
 
